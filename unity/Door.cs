@@ -11,10 +11,11 @@ public class Door : MonoBehaviour
     public Transform player;
 
     private Animator doorAnim;
-    protected bool isPlayerInRange;
+    private bool isPlayerInRange;
     private bool isOpen = false;
 
-    protected KeyCode doorKey = KeyCode.None; // Default key
+    // protected KeyCode doorKey = KeyCode.None; // Default key
+    private string trigger;
 
     void Start()
     {
@@ -25,7 +26,7 @@ public class Door : MonoBehaviour
         }
     }
 
-    protected virtual void Update()
+    void Update()
     {
         CheckPlayerDistance();
 
@@ -36,11 +37,13 @@ public class Door : MonoBehaviour
                 intText.SetActive(true);  // Show interaction text when player is in range
             }
 
-            // if (Input.GetKeyDown(doorKey)) // Use the specified key
-            // {
-            //     ToggleDoor();
-            // }
-            IRsensorcheck();
+            trigger = IRsensorcheck();      // Returns the IR sensor status from sub class function
+
+            if (trigger == "yes") // Use the condition to toggle door
+            {
+                ToggleDoor();
+            }
+    
         }
         else
         {
@@ -51,13 +54,14 @@ public class Door : MonoBehaviour
         }
     }
 
-      // New method for subclasses to override
-    protected virtual void IRsensorcheck()
+    // New method for subclasses to override
+    protected virtual string IRsensorcheck()
     {
-        // Default: Do nothing. Subclasses can override this.
+        // Default: returns no . Subclasses can override this.
+        return "no";
     }
 
-    protected void CheckPlayerDistance()
+    void CheckPlayerDistance()
     {
         if (player != null)
         {
@@ -66,8 +70,9 @@ public class Door : MonoBehaviour
         }
     }
 
-    protected void ToggleDoor()
+    void ToggleDoor()
     {
+
         if (isOpen)
         {
             doorAnim.ResetTrigger("open");
