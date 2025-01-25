@@ -38,7 +38,7 @@ public class TCPManager : MonoBehaviour
     {
         try
         {
-            client = new TcpClient("192.168.4.1", 80); // Replace with NodeMCU IP and port
+            client = new TcpClient("192.168.4.1", 8080); // Replace with NodeMCU IP and port
             stream = client.GetStream();
             isRunning = true;
 

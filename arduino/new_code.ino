@@ -30,6 +30,10 @@ const int calibrationSamples = 200;
 float roll, pitch, yaw;
 float elapsedTime, currentTime, previousTime;
 
+// Pin for Capacitive touch sensor
+#define ain A0
+int touchInput = 0; 
+
 //..................................................................
 // // mpu angle calculation
 // float gyroX, gyroY, gyroZ;
@@ -240,8 +244,15 @@ void loop() {
       //   client.println("IR:OPEN");
       // }
 
-      button.loop();
-      String buttonState = button.isPressed() ? "TRUE" : "FALSE";
+      // button.loop();
+      // String buttonState = button.isPressed() ? "TRUE" : "FALSE";
+
+      // Touch Sensor
+      touchInput=analogRead(ain);
+      // if (inputVal>50 && inputVal<300) {
+      //   Serial.println("JUMP");
+      // }
+      String buttonState = touchInput>50 && touchInput<300 ? "TRUE" : "FALSE";
 
 
       // Format and send data in a single packet
