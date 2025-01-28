@@ -26,6 +26,7 @@ String IRState;
 Adafruit_MPU6050 mpu;
 Kalman kalmanPitch, kalmanRoll;
 float gyroBiasX = 0, gyroBiasY = 0, gyroBiasZ = 0;
+float accelBiasX = 0, accelBiasY = 0, accelBiasZ = 0;
 const int calibrationSamples = 200;
 float roll, pitch, yaw;
 float elapsedTime, currentTime, previousTime;
@@ -71,6 +72,35 @@ void calibrateGyro() {
   gyroBiasY /= calibrationSamples;
   gyroBiasZ /= calibrationSamples;
   Serial.println("Gyro Calibration Complete.");
+}
+
+void calibrateAccelerometer() {
+  float totalX = 0.0, totalY = 0.0, totalZ = 0.0;
+
+  Serial.println("Calibrating accelerometer...");
+  Serial.println("Ensure the MPU6050 is stationary and flat!");
+
+  for (int i = 0; i < calibrationSamples; i++) {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+
+    totalX += a.acceleration.x;
+    totalY += a.acceleration.y;
+    totalZ += a.acceleration.z;
+
+    delay(5); // Small delay between samples
+  }
+
+  // Compute offsets
+  accelBiasX = totalX / calibrationSamples;
+  accelBiasY = totalY / calibrationSamples;
+  accelBiasZ = (totalZ / calibrationSamples) - 9.81; // Gravity adjustment for Z-axis
+
+  Serial.println("Calibration complete!");
+  // Serial.print("Offsets (X, Y, Z): ");
+  // Serial.print(accelXOffset); Serial.print(", ");
+  // Serial.print(accelYOffset); Serial.print(", ");
+  // Serial.println(accelZOffset);
 }
 
 // Function for rotary encoder
@@ -152,6 +182,7 @@ void setup() {
   mpu.setFilterBandwidth(MPU6050_BAND_44_HZ); //5, 10, 21, 44, 94, 184
 
   calibrateGyro();  // Calibrate Gyro
+  calibrateAccelerometer(); //Calibrate Accelerometer
 
   // Interrupt function call for encoder
   attachInterrupt(digitalPinToInterrupt(CLK_PIN), encoderIRS, CHANGE);
@@ -192,9 +223,9 @@ void loop() {
       elapsedTime = (currentTime - previousTime) / 1000.0;
 
       // Apply Low-Pass Filter (LPF) to accelerometer
-      float accX = alpha * a.acceleration.x + (1 - alpha) * prev_accX;
-      float accY = alpha * a.acceleration.y + (1 - alpha) * prev_accY;
-      float accZ = alpha * a.acceleration.z + (1 - alpha) * prev_accZ;
+      float accX = alpha * (a.acceleration.x - accelBiasX) + (1 - alpha) * prev_accX;
+      float accY = alpha * (a.acceleration.y - accelBiasY) + (1 - alpha) * prev_accY;
+      float accZ = alpha * (a.acceleration.z - accelBiasZ) + (1 - alpha) * prev_accZ;
       prev_accX = accX;
       prev_accY = accY;
       prev_accZ = accZ;
