@@ -72,6 +72,13 @@ void calibrateGyro() {
   gyroBiasY /= calibrationSamples;
   gyroBiasZ /= calibrationSamples;
   Serial.println("Gyro Calibration Complete.");
+  Serial.print("X: ");
+  Serial.print(gyroBiasX);
+  Serial.print("/ Y: ");
+  Serial.print(gyroBiasX);
+  Serial.print("/ Z: ");
+  Serial.print(gyroBiasX);
+  Serial.println();
 }
 
 void calibrateAccelerometer() {
@@ -96,11 +103,14 @@ void calibrateAccelerometer() {
   accelBiasY = totalY / calibrationSamples;
   accelBiasZ = (totalZ / calibrationSamples) - 9.81; // Gravity adjustment for Z-axis
 
-  Serial.println("Calibration complete!");
-  // Serial.print("Offsets (X, Y, Z): ");
-  // Serial.print(accelXOffset); Serial.print(", ");
-  // Serial.print(accelYOffset); Serial.print(", ");
-  // Serial.println(accelZOffset);
+  Serial.println("Accelerometer calibration complete!");
+  Serial.print("X: ");
+  Serial.print(accelBiasX);
+  Serial.print("/ Y: ");
+  Serial.print(accelBiasY);
+  Serial.print("/ Z: ");
+  Serial.print(accelBiasZ);
+  Serial.println();
 }
 
 // Function for rotary encoder
