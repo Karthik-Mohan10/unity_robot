@@ -4,6 +4,7 @@
 #include <Wire.h>
 #include <ESP8266WiFi.h>
 #include <Kalman.h>
+#include <ArduinoJson.h>
 
 // Wi-Fi credentials
 const char* ssid = "ESP8266_Access_Point"; 
@@ -305,7 +306,24 @@ void loop() {
                     "/BUTTON:" + buttonState;
                     // "/BUTTON:" + String(button.isPressed());
 
-      client.println(data);
+
+      StaticJsonDocument<256> jsonDoc;
+      jsonDoc["ROLL"] = String(roll, 2);
+      jsonDoc["PITCH"] = String(pitch, 2);
+      jsonDoc["YAW"] = String(yaw, 2);
+      jsonDoc["IR"] = IRState;
+      jsonDoc["TEMP"] = String(temp.temperature, 2);
+      jsonDoc["ENCODER_COUNT"] = String(counter);
+      jsonDoc["ENCODER_DIR"] = String(direction);
+      jsonDoc["BUTTON"] = buttonState;
+
+      String jsonRes;
+
+      serializeJson(jsonDoc, jsonRes);
+      // Serial.println(jsonRes);
+      client.println(jsonRes);
+
+      // client.println(data);
 
       direction = 0;
 
