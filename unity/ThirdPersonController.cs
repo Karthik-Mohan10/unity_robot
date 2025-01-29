@@ -80,6 +80,9 @@ namespace StarterAssets
         private float _cinemachineTargetYaw;
         private float _cinemachineTargetPitch;
 
+        private float defaultYaw;
+        private float defaultPitch;
+
         // player
         private float _speed;
         private float _animationBlend;
@@ -136,6 +139,10 @@ namespace StarterAssets
 
         private void Start()
         {
+            // Store the start values of camera angles
+            // defaultYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
+            defaultPitch = CinemachineCameraTarget.transform.rotation.eulerAngles.x;
+
             _cinemachineTargetYaw = CinemachineCameraTarget.transform.rotation.eulerAngles.y;
             
             _hasAnimator = TryGetComponent(out _animator);
@@ -194,59 +201,40 @@ namespace StarterAssets
 
         private void CameraRotation()
         {
-            // // If there is an input and the camera position is not fixed
-            // if (_input.look.sqrMagnitude >= _threshold && !LockCameraPosition)
-            // {
-            //     // Don't multiply mouse input by Time.deltaTime;
-            //     float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
-
-            //     // Handle mouse input for camera rotation
-            //     _cinemachineTargetYaw += _input.look.x * deltaTimeMultiplier;
-            //     _cinemachineTargetPitch += _input.look.y * deltaTimeMultiplier;
-            // }
-            // else 
-            // {
-            //     float deltaTimeMultiplier = IsCurrentDeviceMouse ? 1.0f : Time.deltaTime;
-
-            //     // Rotate camera to the right
-            //     if (Input.GetKey(KeyCode.L)) 
-            //     {
-            //         _cinemachineTargetYaw += 1 * deltaTimeMultiplier;
-            //     }
-            //     // Rotate camera to the left
-            //     if (Input.GetKey(KeyCode.J)) 
-            //     {
-            //         _cinemachineTargetYaw -= 1 * deltaTimeMultiplier;
-            //     }
-            //     // Rotate camera up
-            //     if (Input.GetKey(KeyCode.I)) 
-            //     {
-            //         _cinemachineTargetPitch -= 1 * deltaTimeMultiplier;
-            //     }
-            //     // Rotate camera down
-            //     if (Input.GetKey(KeyCode.M)) 
-            //     {
-            //         _cinemachineTargetPitch += 1 * deltaTimeMultiplier;
-            //     }
-            // }
 
             // float deltaTimeMultiplier = Time.deltaTime;
             float deltaTimeMultiplier = 0.25f;
-            float c_yaw = 0.0f;
+            float c_yaw = 0.0f; // Declare local variables
             float c_pitch = 0.0f;
+
+             // Check for camera reset input 
+            if (TCPManager.Instance != null && TCPManager.Instance.SensorData.TryGetValue("BUTTON", out string resetCam))
+            {
+                if (resetCam == "TRUE")
+                {
+                    // Reset yaw and pitch to default values
+                    // _cinemachineTargetYaw = defaultYaw;
+                    _cinemachineTargetPitch = defaultPitch;
+
+                }
+            }
 
             // Update camera rotation based on TCP data
             if (TCPManager.Instance != null && TCPManager.Instance.SensorData.TryGetValue("YAW", out string yaw) &&
                 TCPManager.Instance.SensorData.TryGetValue("ENCODER_DIR", out string cam_pitch))
             {
+
+                // Set the yaw and pitch values based on the sensor data
                 float yaw_deg = float.Parse(yaw);
                 float cam_pdeg = float.Parse(cam_pitch);
 
+                // Set the c_yaw value if the sensor data is within a certain range of degrees
                 if (Math.Abs(yaw_deg) > 20 && Math.Abs(yaw_deg) < 90)
                 {
-                    c_yaw = ((yaw_deg) > 0)? 1.0f : -1.0f;
+                    c_yaw = ((yaw_deg) > 0)? -1.0f : 1.0f;
                 }
 
+                // Set the  c_pitch value based on the enoder direction value
                 else if (cam_pdeg == 1.0f)
                 {
                     c_pitch = -1.0f;
@@ -256,23 +244,6 @@ namespace StarterAssets
                 {
                     c_pitch = 1.0f;
                 }
-        
-
-                // if (yaw_deg > 20 && yaw_deg <90)
-                // {
-                //     c_yaw = 1.0f;
-                //     gyroYValue = 0.0f;
-                // }
-                // if (yaw_deg < -20 && yaw_deg > -90)
-                // {
-                //     c_yaw = -1.0f;
-                //     gyroYValue = 0.0f;
-                // }
-
-                // else{
-                //     c_yaw = 0.0f;
-                //     c_pitch = 0.0f;
-                // }
 
                 _cinemachineTargetYaw += c_yaw * deltaTimeMultiplier;
                 _cinemachineTargetPitch += c_pitch * deltaTimeMultiplier;
@@ -290,8 +261,7 @@ namespace StarterAssets
         {
             float accelXValue = 0.0f; // Declare local variables
             float accelYValue = 0.0f;
-            // Set target speed based on move speed, sprint speed and if sprint is pressed
-            float targetSpeed = _input.sprint ? SprintSpeed : MoveSpeed;
+            float targetSpeed = MoveSpeed;
 
             Vector3 inputDirection = Vector3.zero;
 
@@ -300,88 +270,50 @@ namespace StarterAssets
                 TCPManager.Instance.SensorData.TryGetValue("PITCH", out string pitch) &&
                 TCPManager.Instance.SensorData.TryGetValue("ROLL", out string roll))
             {
+                // Set the roll and pitch values based on the sensor data
                 float pitch_deg = float.Parse(pitch);
                 float roll_deg = float.Parse(roll);
-        
-                // Debug.Log($" pitch_deg: {pitch_deg}");
-                if (Math.Abs(pitch_deg) > 40 && Math.Abs(pitch_deg) < 60)
+
+                // Set the speed component if the sensor data is within a certain range of degrees
+                if (Math.Abs(pitch_deg) >= 40)
                 {
 
+                    // Set forward speed to 1.0f or -1.0f based on sign of pitch value
                     accelYValue = ((pitch_deg) < 0)? -1.0f : 1.0f;
+                    // Set target speed based as sprint speed
                     targetSpeed = SprintSpeed;
-                    // if ((pitch_deg) <= 0){
-                    //     accelXValue = 0.0f;
-                    //     accelYValue = -1.0f;
-                    // }
-
-                    // else{
-                    //     accelXValue = 0.0f;
-                    //     accelYValue = 1.0f;
-
-                    // }
-                    
-                    // // targetSpeed = 10.335f;
-                    // targetSpeed = SprintSpeed;
-
                 }
 
                 else if (Math.Abs(pitch_deg) > 20)
                 {
+                    // Set forward speed to 0.5f or -0.5f based on sign of pitch value
                     accelYValue = ((pitch_deg) < 0)? -0.5f : 0.5f;
+                    // Set target speed based as move speed
                     targetSpeed = MoveSpeed;
-                    // if ((pitch_deg) <= 0){
-                    //     accelXValue = 0.0f;
-                    //     accelYValue = -0.5f;
-                    // }
-
-                    // else{
-                    //     accelXValue = 0.0f;
-                    //     accelYValue = 0.5f;
-                    // }
-                    // targetSpeed = MoveSpeed;
-
                 }
-                if (Math.Abs(roll_deg) > 40 && Math.Abs(roll_deg) < 60)
+
+                if (Math.Abs(roll_deg) >= 40)
                 {
-
+                    // Set sideways speed to 1.0f or -1.0f based on sign of roll value
                     accelXValue = ((roll_deg) < 0)? -1.0f : 1.0f;
+                    // Set target speed based as sprint speed
                     targetSpeed = SprintSpeed;
-
                 }
+
                 else if (Math.Abs(roll_deg) > 20)
                 {
+                    // Set sideways speed to 0.5f or -0.5f based on sign of roll value
                     accelXValue = ((roll_deg) < 0)? -0.5f : 0.5f;
+                    // Set target speed based as move speed
                     targetSpeed = MoveSpeed;
-
                 }
-                // else{
-                //     accelXValue = 0.0f;
-                //     accelYValue = 0.0f;
-                // }
-                // float accelXValue = float.Parse(accelX);
-                // float accelYValue = float.Parse(accelY);
-                // Debug.Log($" accel x: {accelXValue}");
-                // Debug.Log($" accel y: {accelYValue}");
-                
 
-                // with respect to the hand gesture - pitch and roll
-
-                inputDirection = new Vector3(accelXValue, 0.0f, accelYValue).normalized;
-                // inputDirection = new Vector3(
-                //     Mathf.Abs(accelXValue) > _threshold ? accelXValue : 0.0f,
-                //     0.0f,
-                //     Mathf.Abs(accelZValue) > _threshold ? accelZValue : 0.0f
-                // ).normalized;
             }
+            // Normalize input direction
+            inputDirection = new Vector3(accelXValue, 0.0f, accelYValue).normalized;
 
             // If there is no accelerometer input, stop movement
             if (inputDirection == Vector3.zero) targetSpeed = 0.0f;
-
-            // A simplistic acceleration and deceleration designed to be easy to remove, replace, or iterate upon
-
-            // Note: Vector2's == operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // If there is no input, set the target speed to 0
-            // if (_input.move == Vector2.zero) targetSpeed = 0.0f;
 
             // A reference to the player's current horizontal velocity
             float currentHorizontalSpeed = new Vector3(_controller.velocity.x, 0.0f, _controller.velocity.z).magnitude;
@@ -396,8 +328,6 @@ namespace StarterAssets
             {
                 // Creates curved result rather than a linear one giving a more organic speed change
                 // Note T in Lerp is clamped, so we don't need to clamp our speed
-                // _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude,
-                    // Time.deltaTime * SpeedChangeRate);
                 _speed = Mathf.Lerp(currentHorizontalSpeed, targetSpeed * inputMagnitude,
                     Time.deltaTime * SpeedChangeRate);
 
@@ -412,19 +342,6 @@ namespace StarterAssets
             _animationBlend = Mathf.Lerp(_animationBlend, targetSpeed, Time.deltaTime * SpeedChangeRate);
             if (_animationBlend < 0.01f) _animationBlend = 0f;
 
-            // Normalize input direction
-            //Vector3 inputDirection = new Vector3(_input.move.x, 0.0f, _input.move.y).normalized;
-
-
-            // Placeholder for ESP32 accelerometer input
-            // Students should add accelerometer input logic here to update inputDirection
-            // Example:
-            // if (accelerometerInputDetected) {
-            //     inputDirection = new Vector3(accelX, 0.0f, accelY).normalized;
-            // }
-
-            // Note: Vector2's != operator uses approximation so is not floating point error prone, and is cheaper than magnitude
-            // If there is a move input, rotate player when the player is moving
             if (inputDirection != Vector3.zero)
             {
 
@@ -445,7 +362,6 @@ namespace StarterAssets
             _controller.Move(targetDirection.normalized * (_speed * Time.deltaTime) +
                             new Vector3(0.0f, _verticalVelocity, 0.0f) * Time.deltaTime);
 
-            //Debug.Log($"Target Direction: {targetDirection}");
 
             // Update animator if using character
             if (_hasAnimator)
@@ -478,7 +394,7 @@ namespace StarterAssets
 
                 // Jump
                 if (TCPManager.Instance != null &&
-                TCPManager.Instance.SensorData.TryGetValue("BUTTON", out string j_button))
+                TCPManager.Instance.SensorData.TryGetValue("JUMP", out string j_button))
 
                 {
                     if (j_button == "TRUE" && _jumpTimeoutDelta <= 0.0f)
