@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Threading;
 using UnityEngine;
+using Newtonsoft.Json;
 
 public class TCPManager : MonoBehaviour
 {
@@ -38,7 +39,7 @@ public class TCPManager : MonoBehaviour
     {
         try
         {
-            client = new TcpClient("192.168.4.1", 8080); // Replace with NodeMCU IP and port
+            client = new TcpClient("192.168.4.1", 80); // Replace with NodeMCU IP and port
             stream = client.GetStream();
             isRunning = true;
 
@@ -55,48 +56,84 @@ public class TCPManager : MonoBehaviour
     }
 
 
-    private void ReceiveMessages()
-    {
-        byte[] buffer = new byte[1024];
+   private void ReceiveMessages()
+{
+    byte[] buffer = new byte[1024];
 
-        while (isRunning)
+    while (isRunning)
+    {
+        try
         {
-            try
+            if (stream != null && stream.DataAvailable)
             {
-                if (stream != null && stream.DataAvailable)
+                int bytesRead = stream.Read(buffer, 0, buffer.Length);
+                string receivedData = Encoding.UTF8.GetString(buffer, 0, bytesRead);
+
+                // Process only the first JSON object
+                string firstJson = ExtractFirstJson(receivedData);
+
+                if (!string.IsNullOrEmpty(firstJson))
                 {
-                    int bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    string message = Encoding.UTF8.GetString(buffer, 0, bytesRead);
-                    Debug.Log("Message from NodeMCU: " + message);
-                    
-                    foreach (string line in message.Split('/'))
-                        ProcessMessage(line.Trim());
+                    try
+                    {
+                        ProcessMessage(firstJson);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError("Failed to process JSON: " + e.Message);
+                    }
                 }
             }
-            catch (Exception e)
-            {
-                Debug.LogError("Receive error: " + e.Message);
-            }
-            
-            Thread.Sleep(10);
         }
+        catch (Exception e)
+        {
+            Debug.LogError("Receive error: " + e.Message);
+        }
+
+        Thread.Sleep(10);
     }
+}
+
+	private string ExtractFirstJson(string data)
+{
+    int startIndex = data.IndexOf('{'); // Find the first '{'
+    int endIndex = data.IndexOf('}');   // Find the first '}'
+
+    if (startIndex != -1 && endIndex != -1 && endIndex > startIndex)
+    {
+        return data.Substring(startIndex, endIndex - startIndex + 1); // Extract the JSON substring
+    }
+
+    return null; // No valid JSON object found
+}
+
 
     private void ProcessMessage(string message)
-    {
-        if (string.IsNullOrWhiteSpace(message)) return;
+{
+    message = message.Trim();
 
-        string[] parts = message.Split(':', 2);
-        if (parts.Length == 2)
+    if (string.IsNullOrWhiteSpace(message)) return;
+
+    try
+    {
+        var parsedData = JsonConvert.DeserializeObject<Dictionary<string, string>>(message);
+
+        if (parsedData != null)
         {
-            lock (SensorData)
-                SensorData[parts[0].Trim()] = parts[1].Trim();
-        }
-        else
-        {
-            Debug.LogWarning($"Invalid message format: {message}");
+            foreach (var item in parsedData)
+            {
+                SensorData[item.Key] = item.Value;
+            }
+
+            Debug.Log("Processed JSON: " + message);
         }
     }
+    catch (JsonException e)
+    {
+        Debug.LogError("JSON parsing error: " + e.Message);
+    }
+}
+
 
      void OnDestroy()
     {
