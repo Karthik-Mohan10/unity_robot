@@ -243,10 +243,14 @@ void loop() {
       // IR Sensor
       IRState = digitalRead(IR) == 0 ? "CLOSE" : "OPEN";
 
+      // Encoder button
+      button.loop();
+      String buttonState = button.isPressed() ? "TRUE" : "FALSE";
+
       // Touch Sensor
       // The sensor registers a touch when the Analog pin outputs a value between 100 and 300
       touchInput=analogRead(ain);
-      String buttonState = touchInput>100 && touchInput<300 ? "TRUE" : "FALSE";
+      String jumpState = touchInput>100 && touchInput<300 ? "TRUE" : "FALSE";
 
       // Store all values to be sent as a JSON
       StaticJsonDocument<256> jsonDoc;
@@ -257,6 +261,7 @@ void loop() {
       jsonDoc["TEMP"] = String(temp.temperature, 2);
       jsonDoc["ENCODER_COUNT"] = String(counter);
       jsonDoc["ENCODER_DIR"] = String(direction);
+      jsonDoc["JUMP"] = jumpState;
       jsonDoc["BUTTON"] = buttonState;
 
       String jsonRes;
