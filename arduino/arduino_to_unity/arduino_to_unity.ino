@@ -1,59 +1,57 @@
-#include <ezButton.h> // The library to use for SW pin
+#include <ezButton.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Wire.h>
 #include <ESP8266WiFi.h>
 #include <Kalman.h>
+#include <ArduinoJson.h>
 
 // Wi-Fi credentials
 const char* ssid = "ESP8266_Access_Point"; 
 const char* password = "12345678";
 WiFiServer server(80);
 
-int IR = 2; // Output of IR sensor connected to digital pin D4
+// Sensor Connections and Variables
+
+// Infrared Sensor
+#define IR 2 // Output of IR sensor connected to digital pin D4
 String IRState;
 
-// Rotary encoder pins
+// Rotary Encoder
 #define CLK_PIN 13  // The ESP8266 pin D7 connected to the rotary encoder's CLK pin
 #define DT_PIN 12   // The ESP8266 pin D6 connected to the rotary encoder's DT pin
 #define SW_PIN 14   // The ESP8266 pin D5 connected to the rotary encoder's SW pin
-#define DIRECTION_CW -1   // clockwise direction
-#define DIRECTION_CCW 1  // counter-clockwise direction
+#define DIRECTION_CW -1   // Clockwise direction
+#define DIRECTION_CCW 1  // Counter-clockwise direction
 #define DEBOUNCE_TIME 5  // Debounce time in milliseconds
+volatile int counter = 0;
+volatile int direction = 0;
+volatile unsigned long lastInterruptTime = 0;  // Stores the last interrupt timestamp
+ezButton button(SW_PIN);  // Create ezButton object for pin 7
+int prev_counter;
 
-// Sensor & filtering variables
-//connect the SCL pin to D1 and the SDA pin to D2 for MPU6050
+// Capacitive Sensor
+#define ain A0  // Capacitive sensor is connected to Analog pin A0 and Ground
+int touchInput = 0; 
+
+// Gyroscope and Accelerometer
+// Connect the SCL pin to D1 and the SDA pin to D2 for MPU6050
 Adafruit_MPU6050 mpu;
 Kalman kalmanPitch, kalmanRoll;
 float gyroBiasX = 0, gyroBiasY = 0, gyroBiasZ = 0;
+float accelBiasX = 0, accelBiasY = 0, accelBiasZ = 0;
 const int calibrationSamples = 200;
 float roll, pitch, yaw;
 float elapsedTime, currentTime, previousTime;
 
-//..................................................................
-// // mpu angle calculation
-// float gyroX, gyroY, gyroZ;
-// float accAngleX, accAngleY, accAngleZ, gyroAngleX, gyroAngleY, gyroAngleZ;
-// float AccX, AccY, AccZ;
-
-// int IR = 0; // digital pin D3 has a Infrared attached to it.
-
-// ..................................................................
-
-// Rotary encoder variables
-volatile int counter = 0;
-volatile int direction = 0;
-volatile unsigned long lastInterruptTime = 0;  // Stores the last interrupt timestamp
-ezButton button(SW_PIN);  // create ezButton object for pin 7
-int prev_counter;
-
-// Low-Pass Filter factor (0.0 - 1.0), lower values filter more noise.......................new
+// Low-Pass Filter factor (0.0 - 1.0). Lower values of alpha filter more noise
 const float alpha = 0.2;  
 float prev_accX = 0, prev_accY = 0, prev_accZ = 0;
 float prev_gyroX, prev_gyroY, prev_gyroZ;
 
-// Function to calibrate Gyro
+// Function to calibrate gyroscope
 void calibrateGyro() {
+  Serial.println("Ensure the MPU6050 is stationary and flat!");
   Serial.println("Calibrating Gyroscope...");
   for (int i = 0; i < calibrationSamples; i++) {
     sensors_event_t a, g, temp;
@@ -66,7 +64,32 @@ void calibrateGyro() {
   gyroBiasX /= calibrationSamples;
   gyroBiasY /= calibrationSamples;
   gyroBiasZ /= calibrationSamples;
-  Serial.println("Gyro Calibration Complete.");
+  Serial.println("Gyroscope Calibration Complete!");
+}
+
+// Function to calibrate accelerometer
+void calibrateAccelerometer() {
+  float totalX = 0.0, totalY = 0.0, totalZ = 0.0;
+
+  Serial.println("Calibrating Accelerometer...");
+
+  for (int i = 0; i < calibrationSamples; i++) {
+    sensors_event_t a, g, temp;
+    mpu.getEvent(&a, &g, &temp);
+
+    totalX += a.acceleration.x;
+    totalY += a.acceleration.y;
+    totalZ += a.acceleration.z;
+
+    delay(5); // Small delay between samples
+  }
+
+  // Compute offsets
+  accelBiasX = totalX / calibrationSamples;
+  accelBiasY = totalY / calibrationSamples;
+  accelBiasZ = (totalZ / calibrationSamples) - 9.81; // Gravity adjustment for Z-axis
+
+  Serial.println("Accelerometer Calibration Complete!");
 }
 
 // Function for rotary encoder
@@ -77,6 +100,7 @@ void ICACHE_RAM_ATTR encoderIRS() {
   if (currentInterruptTime - lastInterruptTime < DEBOUNCE_TIME) {
       return;
   }
+
   lastInterruptTime = currentInterruptTime;  // Update last interrupt time
   static int lastState = 0;
   int currentState = (digitalRead(CLK_PIN) << 1) | digitalRead(DT_PIN);
@@ -89,13 +113,14 @@ void ICACHE_RAM_ATTR encoderIRS() {
       
       counter--;
       direction = DIRECTION_CW;   // value = 1(count decrease)
-    } else {
+    } 
+    else {
       counter++;
       direction = DIRECTION_CCW;  // value = -1(count increase)
     }
     lastState = currentState;
   }
-  else{
+  else {
     //Serial.println("NO_ROTATION");
     direction = 0;
   }
@@ -120,10 +145,10 @@ void setup() {
   server.begin();
   Serial.println("Server started");
 
-  //IR Sensor
+  // IR Sensor
   pinMode(IR, INPUT);
 
-  //Rotary Encoder
+  // Rotary Encoder
   pinMode(CLK_PIN, INPUT);
   pinMode(DT_PIN, INPUT);
   pinMode(SW_PIN, INPUT_PULLUP);
@@ -131,66 +156,64 @@ void setup() {
 
   while (!Serial)
     delay(10); // will pause Zero, Leonardo, etc until serial console opens
-
   
   // Initialize MPU6050
   if (!mpu.begin()) {
     Serial.println("MPU6050 not found!");
     while (1) delay(10);
   }
-  else{
+  else {
     Serial.println("MPU6050 Found!");
   }
 
   // Set MPU parameters
   mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
   mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_44_HZ); //5, 10, 21, 44, 94, 184
+  mpu.setFilterBandwidth(MPU6050_BAND_44_HZ);
 
-  calibrateGyro();  // Calibrate Gyro
+  // Call calibration functions
+  calibrateGyro();
+  calibrateAccelerometer();
 
   // Interrupt function call for encoder
   attachInterrupt(digitalPinToInterrupt(CLK_PIN), encoderIRS, CHANGE);
   attachInterrupt(digitalPinToInterrupt(DT_PIN), encoderIRS, CHANGE); // To determine the direction
 
-  //MPU6050 event intialization
+  // MPU6050 event intialization
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
   // Initialize Kalman filter with the first accelerometer angle
-  kalmanPitch.setAngle(atan2(a.acceleration.y, a.acceleration.z) * 180 / PI);
-  kalmanRoll.setAngle(atan2(-a.acceleration.x, a.acceleration.z) * 180 / PI);
+  kalmanPitch.setAngle(atan2((a.acceleration.y - accelBiasY), (a.acceleration.z - accelBiasZ)) * 180 / PI);
+  kalmanRoll.setAngle(atan2((-a.acceleration.x - accelBiasX), (a.acceleration.z - accelBiasZ)) * 180 / PI);
 
-  currentTime = millis();
-
-  
   Serial.println("Waiting for client connection...");
 
-  // delay(50);
+  delay(50);
 }
 
 void loop() {
   WiFiClient client = server.available();
   if (!client) return;  // Wait for a client to connect
 
-
   while (client.connected()) {  // Keep sending data while the client is connected
     static unsigned long lastUpdate = 0;
     if (millis() - lastUpdate > 50) {  // 20Hz update rate
       lastUpdate = millis();
 
-      // MPU angle.......
+      // Calculate orientation angles from MPU6050 readings
       sensors_event_t a, g, temp;
       mpu.getEvent(&a, &g, &temp);
-      //Get time
+
+      // Get time interval for gyro angle calculation
       previousTime = currentTime;
       currentTime = millis();
       elapsedTime = (currentTime - previousTime) / 1000.0;
 
       // Apply Low-Pass Filter (LPF) to accelerometer
-      float accX = alpha * a.acceleration.x + (1 - alpha) * prev_accX;
-      float accY = alpha * a.acceleration.y + (1 - alpha) * prev_accY;
-      float accZ = alpha * a.acceleration.z + (1 - alpha) * prev_accZ;
+      float accX = alpha * (a.acceleration.x - accelBiasX) + (1 - alpha) * prev_accX;
+      float accY = alpha * (a.acceleration.y - accelBiasY) + (1 - alpha) * prev_accY;
+      float accZ = alpha * (a.acceleration.z - accelBiasZ) + (1 - alpha) * prev_accZ;
       prev_accX = accX;
       prev_accY = accY;
       prev_accZ = accZ;
@@ -200,12 +223,11 @@ void loop() {
       float accAngleY = atan2(-accX, sqrt(accY * accY + accZ * accZ)) * 180 / PI;
 
       // Apply Kalman filter
-      roll = kalmanRoll.getAngle(accAngleX, g.gyro.x * 180 / PI * elapsedTime, elapsedTime);
-      pitch = kalmanPitch.getAngle(accAngleY, g.gyro.y * 180 / PI * elapsedTime, elapsedTime);
+      roll = kalmanRoll.getAngle(accAngleX, (g.gyro.x - gyroBiasX) * 180 / PI * elapsedTime, elapsedTime);
+      pitch = kalmanPitch.getAngle(accAngleY, (g.gyro.y - gyroBiasY) * 180 / PI * elapsedTime, elapsedTime);
 
       // Complementary filter for yaw (no accelerometer correction)
       yaw = 0.98 * (yaw + (g.gyro.z - gyroBiasZ) * elapsedTime * 180 / PI) + 0.02 * yaw;
-
 
       // Print the values on the serial monitor
       Serial.print("Roll: ");
@@ -218,44 +240,31 @@ void loop() {
       Serial.println(yaw);
       Serial.println();
 
-      /* Print out the values */
-      Serial.print("Acceleration X: ");
-      Serial.print(a.acceleration.x);
-      Serial.print(", Y: ");
-      Serial.print(a.acceleration.y);
-      Serial.print(", Z: ");
-      Serial.print(a.acceleration.z);
-      // Serial.println(" m/s^2");
-
-
       // IR Sensor
-      // int IRState = digitalRead(IR);
-      Serial.print("Object Detection: ");
-      Serial.println(digitalRead(IR));
       IRState = digitalRead(IR) == 0 ? "CLOSE" : "OPEN";
-      // if (IRState == 0){
-      //   client.println("IR:CLOSE");
-      // }
-      // else if (IRState == 1){
-      //   client.println("IR:OPEN");
-      // }
 
-      button.loop();
-      String buttonState = button.isPressed() ? "TRUE" : "FALSE";
+      // Touch Sensor
+      // The sensor registers a touch when the Analog pin outputs a value between 100 and 300
+      touchInput=analogRead(ain);
+      String buttonState = touchInput>100 && touchInput<300 ? "TRUE" : "FALSE";
 
+      // Store all values to be sent as a JSON
+      StaticJsonDocument<256> jsonDoc;
+      jsonDoc["ROLL"] = String(roll, 2);
+      jsonDoc["PITCH"] = String(pitch, 2);
+      jsonDoc["YAW"] = String(yaw, 2);
+      jsonDoc["IR"] = IRState;
+      jsonDoc["TEMP"] = String(temp.temperature, 2);
+      jsonDoc["ENCODER_COUNT"] = String(counter);
+      jsonDoc["ENCODER_DIR"] = String(direction);
+      jsonDoc["BUTTON"] = buttonState;
 
-      // Format and send data in a single packet
-      String data = "ROLL:" + String(roll, 2) + "/PITCH:" + String(pitch, 2) + 
-                    "/YAW:" + String(yaw, 2) + "/IR:" + IRState + 
-                    "/TEMP:" + String(temp.temperature, 2) + 
-                    "/ENCODER_COUNT:" + String(counter) +
-                    "/ENCODER_DIR:" + String(direction) +
-                    "/BUTTON:" + buttonState;
-                    // "/BUTTON:" + String(button.isPressed());
+      String jsonRes;
 
-      client.println(data);
+      serializeJson(jsonDoc, jsonRes);
 
-      direction = 0;
+      // Send values to Unity
+      client.println(jsonRes);
 
       // Reset encoder direction only when a new movement is detected
       static int lastCounter = 0;
@@ -265,35 +274,9 @@ void loop() {
       }
     }
     
-
     if (prev_counter != counter) {
-
-      Serial.println("Rotary Encoder:");
-        // if (direction == DIRECTION_CW){
-        //   Serial.print("CLOCKWISE");
-        //   client.println("ENCODER:CLOCKWISE");
-        // }
-        // else if (direction== DIRECTION_CCW) {
-        //   Serial.print("ANTICLOCKWISE");
-        //   client.println("ENCODER:ANTICLOCKWISE");
-        // }
-      Serial.print(" - direction: ");
-      Serial.println(direction);
-      Serial.print(" - count: ");
-      Serial.println(counter);
-
       prev_counter = counter;
     }
-
-    // button.loop();  // MUST call the loop() function first
-    // if (button.isPressed()) {
-    //   Serial.println("BUTTON_PRESSED");
-    //   client.println("/BUTTON:TRUE");
-    // }
-    // else{
-    //   client.println("/BUTTON:FALSE");
-    // }
-
   }
 
   Serial.println("Client disconnected.");
