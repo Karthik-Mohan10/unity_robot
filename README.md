@@ -17,3 +17,5 @@
 #### 7. ESP8266 Microcontroller
 #### 8. Breadboard
 
+## Robot Demonstration
+### ![robot jumping demonstration](images/robot_jumping_gif.gif)
