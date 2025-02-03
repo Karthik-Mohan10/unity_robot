@@ -1,5 +1,5 @@
 ## Overview
-### The outcome of this project is to implement robot simulation in Unity environment using the real-world sensor values..
+### The outcome of this project is to understand the working of various sensors and their applications by integrating the sensor system to control a humanoid robot in a predeveloped open world game environment.
 
 ## Hardware setup
 ### ![Hardware setup](images/hardware_setup.jpg)
