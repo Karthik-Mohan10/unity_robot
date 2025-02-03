@@ -1,7 +1,7 @@
 ## Overview
 ### The outcome of this project is to understand the working of various sensors and their applications by integrating the sensor system to control a humanoid robot in a predeveloped open world game environment.
 
-### The presentation of this project can be found ![here](presentation.pdf)
+### The presentation of this project can be found [here](presentation.pdf).
 
 ## Hardware setup
 ### ![Hardware setup](images/hardware_setup.jpg)
